@@ -26,9 +26,9 @@ typedef struct {
 } directoryEntry_t;
 
 typedef struct {
-  char ni[21];
-  char directoryIndex;
-  char length;
+  char ni[22];
+  uint8_t directoryIndex;
+  uint8_t length;
   char data[MAX_POD_DATA_BYTES];
 } registryEntry_t;
 
@@ -41,8 +41,8 @@ private:
   uint32_t _timeout;
 
   // Objects that should be guarded by mutex (for exclusive access)
-  char _directoryEntries; // Number of associated FCs
-  char _registryEntries; // Number of registered FCs
+  uint8_t _directoryEntries; // Number of associated FCs
+  uint8_t _registryEntries; // Number of registered FCs
   directoryEntry_t _fcDirectory[MAX_FC];
   registryEntry_t _fcRegistry[MAX_FC];
 
@@ -59,6 +59,7 @@ private:
 public:
   CM_to_FC(PinName tx, PinName rx);
   void invite();
+  void invite_registry();
   void broadcast_launch_primed(char dataInterval);
   void broadcast_launch_detected();
   void broadcast_descent_detected();
@@ -72,6 +73,7 @@ public:
   void sync_registry();
   int  get_pod_data(char* data);
   int  link_count();
+  char registry_length();
 
   void printDirectory();
   void printRegistry();

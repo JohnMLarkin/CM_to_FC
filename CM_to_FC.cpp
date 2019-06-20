@@ -75,6 +75,27 @@ void CM_to_FC::invite() {
   _xbee.txBroadcast(msg, 1);
 }
 
+void CM_to_FC::invite_registry() {
+  char msg[1];
+  msg[0] = 0x00;
+  uint64_t addr;
+  if (_registry_mutex.trylock_for(_timeout)) {
+    if (_registryEntries>0) {
+      for (int i = 0; i < _registryEntries; i++) {
+        if (_fcRegistry[i].directoryIndex == 0xFF) {
+          addr = _xbee.get_address(_fcRegistry[i].ni);
+          if (addr) _xbee.txAddressed(addr, msg, 1);
+        }
+      }
+    }
+    _registry_mutex.unlock();
+  }
+}
+
+char CM_to_FC::registry_length() {
+  return _registryEntries;
+}
+
 void CM_to_FC::printDirectory() {
   if (_directory_mutex.trylock_for(_timeout)) {
     if (_directoryEntries>0) {
@@ -95,7 +116,7 @@ void CM_to_FC::printRegistry() {
       printf("Registry:\r\n");
       printf("Identifier \tDirectory Index\r\n");
       for (int i = 0; i < _registryEntries; i++) {
-        if (_fcRegistry[i].directoryIndex<MAX_FC) {
+        if (_fcRegistry[i].directoryIndex != 0xFF) {
           printf("%s \t%d\r\n", _fcRegistry[i].ni, _fcRegistry[i].directoryIndex);
         } else {
           printf("%s \tN/A\r\n", _fcRegistry[i].ni);
@@ -114,7 +135,7 @@ void CM_to_FC::request_data(uint64_t addr) {
 }
 
 void CM_to_FC::request_data_all() {
-  char n;
+  uint8_t n;
   if (_registry_mutex.trylock_for(_timeout)) {
     if (_registryEntries>0) {
       if (_directory_mutex.trylock_for(_timeout)) {
@@ -144,15 +165,26 @@ void CM_to_FC::send_clock(uint64_t addr) {
 }
 
 void CM_to_FC::sync_registry() {
+  Timer t;
   uint64_t addr;
   if (_registry_mutex.trylock_for(_timeout)) {
     if (_directory_mutex.trylock_for(_timeout)) {
       for (int i = 0; i < _registryEntries; i++) {
         if (_fcRegistry[i].directoryIndex==0xFF) {
-          addr = _xbee.get_address(_fcRegistry[i].ni);
-          for (int j = 0; j < _directoryEntries; j++) {
-            if (_fcDirectory[j].address==addr)
-              _fcRegistry[i].directoryIndex = j;
+          printf("Looking for %s\r\n", _fcRegistry[i].ni);
+          t.start();
+          addr = 0;
+          while (addr == 0) {
+            addr = _xbee.get_address(_fcRegistry[i].ni);
+          }
+          if (addr >= XBEE_MIN_ADDRESS) {
+            printf("Its address is %016llX\r\n", addr);
+            for (int j = 0; j < _directoryEntries; j++) {
+              if (_fcDirectory[j].address==addr) {
+                _fcRegistry[i].directoryIndex = j;
+                printf("Found match at index %d\r\n", _fcRegistry[i].directoryIndex);
+              }
+            }
           }
         }
       }
@@ -214,7 +246,7 @@ void CM_to_FC::_listen_for_rx() {
 }
 
 void CM_to_FC::_process_clock_test(uint64_t addr, char testCode) {
-  char directoryIndex = 0xFF;
+  uint8_t directoryIndex = 0xFF;
   if (_directory_mutex.trylock_for(_timeout)) {  // Acquire exclusive access to the directory
     // Is this device in the directory?
     if (_directoryEntries>0) { // Directory entries exist so check
@@ -232,10 +264,9 @@ void CM_to_FC::_process_clock_test(uint64_t addr, char testCode) {
 }
 
 void CM_to_FC::_process_pod_data(uint64_t addr, char* payload, char len) {
-  char directoryIndex = 0xFF;
-  char registryIndex = 0xFF;
-  char n;
-  char k;
+  uint8_t registryIndex = 0xFF;
+  uint8_t n;
+  uint8_t k;
   if (_registry_mutex.trylock_for(_timeout) && _directory_mutex.trylock_for(_timeout)) {
     if (_registryEntries>0) {
       k = 0;
@@ -260,7 +291,7 @@ void CM_to_FC::_process_pod_data(uint64_t addr, char* payload, char len) {
 }
 
 void CM_to_FC::printPodData() {
-  char n;
+  uint8_t n;
   if (_registry_mutex.trylock_for(_timeout) && _directory_mutex.trylock_for(_timeout)) {
     if (_registryEntries>0) {
       printf("Pod Data\r\n");
@@ -286,7 +317,7 @@ void CM_to_FC::printPodData() {
 
 int CM_to_FC::get_pod_data(char* data) {
   int len = 0;
-  char n;
+  uint8_t n;
   if (_registry_mutex.trylock_for(_timeout) && _directory_mutex.trylock_for(_timeout)) {
     if (_registryEntries>0) {
       for (int i = 0; i < _registryEntries; i++) {
@@ -306,7 +337,7 @@ int CM_to_FC::get_pod_data(char* data) {
 
 int CM_to_FC::link_count() {
   int linked = 0;
-  char n;
+  uint8_t n;
   if (_registry_mutex.trylock_for(_timeout) && _directory_mutex.trylock_for(_timeout)) {
     if (_registryEntries>0) {
       for (int i = 0; i < _registryEntries; i++) {
@@ -321,7 +352,7 @@ int CM_to_FC::link_count() {
 }
 
 void CM_to_FC::_process_rsvp(uint64_t addr, char connectType) {
-  char directoryIndex = 0xFF;
+  uint8_t directoryIndex = 0xFF;
   if (_directory_mutex.trylock_for(_timeout)) {  // Acquire exclusive access to the directory
     // Does a connection listing already exist for this device?
     if (_directoryEntries>0) { // Directory entries exist so check
