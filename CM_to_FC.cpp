@@ -188,7 +188,9 @@ void CM_to_FC::_listen_for_rx() {
   int len;
   char msg[MAX_MSG_LENGTH];
   uint64_t sender = 0;
+  _xbee.set_frame_alert_thread_id(osThreadGetId());
   while (true) {
+    osSignalWait(0x01,osWaitForever);
     if (_xbee.readable()) {
       len = _xbee.rxPacket(msg, &sender);
       if (len > 0) {
@@ -208,7 +210,6 @@ void CM_to_FC::_listen_for_rx() {
         }
       }
     }
-    wait_ms(_timeout);
   }
 }
 
