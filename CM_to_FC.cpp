@@ -96,6 +96,10 @@ char CM_to_FC::registry_length() {
   return _registryEntries;
 }
 
+char CM_to_FC::directory_length() {
+  return _directoryEntries;
+}
+
 void CM_to_FC::printDirectory() {
   if (_directory_mutex.trylock_for(_timeout)) {
     if (_directoryEntries>0) {

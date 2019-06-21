@@ -74,6 +74,7 @@ public:
   int  get_pod_data(char* data);
   int  link_count();
   char registry_length();
+  char directory_length();
 
   void printDirectory();
   void printRegistry();
