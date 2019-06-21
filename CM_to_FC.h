@@ -16,8 +16,8 @@
 using namespace std;
 
 #define MAX_FC 6
-#define MAX_MSG_LENGTH 110
-#define MAX_POD_DATA_BYTES 100
+#define MAX_MSG_LENGTH 70
+#define MAX_POD_DATA_BYTES 50
 
 typedef struct {
   uint64_t address;
