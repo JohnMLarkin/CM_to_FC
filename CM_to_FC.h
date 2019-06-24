@@ -64,6 +64,7 @@ public:
   void broadcast_launch_detected();
   void broadcast_descent_detected();
   void broadcast_landed();
+  void clear_registry();
   void request_data(uint64_t addr);
   void request_data_all();
   void send_clock(uint64_t addr);

@@ -65,6 +65,10 @@ void CM_to_FC::broadcast_landed() {
   _xbee.txBroadcast(msg, 1);
 }
 
+void CM_to_FC::clear_registry() {
+  _registryEntries = 0;
+}
+
 /** Broadcast code for invite to connect
  * 
  *  Testing status:  Lab tested
