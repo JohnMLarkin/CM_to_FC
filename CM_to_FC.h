@@ -27,9 +27,11 @@ typedef struct {
 
 typedef struct {
   char ni[22];
+  uint8_t index;
   uint8_t directoryIndex;
   uint8_t length;
   char data[MAX_POD_DATA_BYTES];
+  bool dataUpdated;
 } registryEntry_t;
 
 extern DigitalOut led2;;
@@ -67,15 +69,19 @@ public:
   void clear_registry();
   void request_data(uint64_t addr);
   void request_data_all();
+  void request_data_by_index(char n);
   void send_clock(uint64_t addr);
   void test_clock(uint64_t addr);
   void test_all_clocks();
-  void add_registry_entry(char* ni, char len);
+  bool get_clock_status(char n, char* ni);
+  void add_registry_entry(char n, char* ni, char len);
   void sync_registry();
-  int  get_pod_data(char* data);
+  int  get_pod_data(char n, char* data);
   int  link_count();
   char registry_length();
   char directory_length();
+  char pod_index(char n);
+  bool is_all_data_updated();
 
   void printDirectory();
   void printRegistry();

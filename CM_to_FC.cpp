@@ -9,12 +9,14 @@ CM_to_FC::CM_to_FC(PinName tx, PinName rx) : _xbee(tx, rx) {
   _rx_thread.start(callback(this, &CM_to_FC::_listen_for_rx));
 }
 
-void CM_to_FC::add_registry_entry(char* ni, char len) {
+void CM_to_FC::add_registry_entry(char n, char* ni, char len) {
   if (_registry_mutex.trylock_for(_timeout)) {
     if (_registryEntries<MAX_FC) {
       strcpy(_fcRegistry[_registryEntries].ni,ni);
+      _fcRegistry[_registryEntries].index = n;
       _fcRegistry[_registryEntries].directoryIndex = 0xFF;
       _fcRegistry[_registryEntries].length = len;
+      _fcRegistry[_registryEntries].dataUpdated = false;
       _registryEntries++;
     }
     _registry_mutex.unlock();
@@ -134,12 +136,39 @@ void CM_to_FC::printRegistry() {
     }
     _registry_mutex.unlock();
   }
-}  
+}
+
+bool CM_to_FC::get_clock_status(char n, char* ni) {
+  bool good_clock = false;
+  if (_registry_mutex.trylock_for(_timeout)) {
+    if (n < _registryEntries) {
+      strcpy(ni, _fcRegistry[n].ni);
+      if (_fcRegistry[n].directoryIndex != 0xFF) {
+        good_clock = _fcDirectory[_fcRegistry[n].directoryIndex].goodClock;
+      }
+    }
+    _registry_mutex.unlock();
+  }
+  return good_clock;
+}
 
 void CM_to_FC::request_data(uint64_t addr) {
   char msg[1];
   msg[0] = 0x40;
   _xbee.txAddressed(addr, msg, 1);
+}
+
+void CM_to_FC::request_data_by_index(char n) {
+  if (_registry_mutex.trylock_for(_timeout)) {
+    if (n < _registryEntries) {
+      char i = _fcRegistry[n].directoryIndex;
+      if (i != 0xFF) {
+        uint64_t addr = _fcDirectory[i].address;
+        request_data(addr);
+      }
+    }
+    _registry_mutex.unlock();
+  }
 }
 
 void CM_to_FC::request_data_all() {
@@ -150,7 +179,7 @@ void CM_to_FC::request_data_all() {
         for (int i = 0; i < _registryEntries; i++) {
           n = _fcRegistry[i].directoryIndex;
           if (n != 0xFF) {
-            if (_fcDirectory[n].connectType==0x02) {
+            if ((_fcDirectory[n].connectType==0x02) && (_fcRegistry[i].length>0)) {
               request_data(_fcDirectory[n].address);
             }  
           } 
@@ -289,7 +318,8 @@ void CM_to_FC::_process_pod_data(uint64_t addr, char* payload, char len) {
       }
       if ((registryIndex < _registryEntries) && (_fcRegistry[registryIndex].length == (len-1))) {
         for (int j = 0; j < (len-1); j++)
-          _fcRegistry[registryIndex].data[j] = payload[j+1]; 
+          _fcRegistry[registryIndex].data[j] = payload[j+1];
+        _fcRegistry[registryIndex].dataUpdated = true; 
       } else {
       }
     }
@@ -322,18 +352,29 @@ void CM_to_FC::printPodData() {
   }
 }
 
-
-int CM_to_FC::get_pod_data(char* data) {
+/**
+ * get_pod_data
+ * 
+ * podNum:  number of pod (1-6)
+ * 
+ */
+int CM_to_FC::get_pod_data(char podNum, char* data) {
   int len = 0;
-  uint8_t n;
+  char i = 0xFF;  // location of desired pod in registry
+  char k = 0;
   if (_registry_mutex.trylock_for(_timeout) && _directory_mutex.trylock_for(_timeout)) {
-    if (_registryEntries>0) {
-      for (int i = 0; i < _registryEntries; i++) {
-        n = _fcRegistry[i].directoryIndex;
+    while ((k < _registryEntries) && (i > _registryEntries)) {
+      if (_fcRegistry[k].index == podNum) i = k;
+      k++;
+    }
+    if (i < _registryEntries) {
+      if (_fcRegistry[i].dataUpdated) {
+        char n = _fcRegistry[i].directoryIndex;  // location of desired pod in directory
         if ((n != 0xFF) && (_fcDirectory[n].connectType == 0x02)) {
           for (int j = 0; j < _fcRegistry[i].length; j++)
             data[len+j] = _fcRegistry[i].data[j];
-          len = len + _fcRegistry[i].length;
+          len = _fcRegistry[i].length;
+          _fcRegistry[i].dataUpdated = false;
         }
       }
     }
@@ -357,6 +398,19 @@ int CM_to_FC::link_count() {
     _registry_mutex.unlock();
   }
   return linked;
+}
+
+bool CM_to_FC::is_all_data_updated() {
+  bool ready = true;
+  for (int i = 0; i < _registryEntries; i++)
+    ready = ready && _fcRegistry[i].dataUpdated;
+  return ready;
+}
+
+char CM_to_FC::pod_index(char i) {
+  if (i < _registryEntries) {
+    return _fcRegistry[i].index;
+  }
 }
 
 void CM_to_FC::_process_rsvp(uint64_t addr, char connectType) {
