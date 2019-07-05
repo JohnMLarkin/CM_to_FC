@@ -6,6 +6,7 @@ CM_to_FC::CM_to_FC(PinName tx, PinName rx) : _xbee(tx, rx) {
   _directoryEntries = 0;
   _registryEntries = 0;
   _timeout = 100;
+  _linkedForData = 0;
   _rx_thread.start(callback(this, &CM_to_FC::_listen_for_rx));
 }
 
@@ -204,6 +205,7 @@ void CM_to_FC::send_clock(uint64_t addr) {
 void CM_to_FC::sync_registry() {
   Timer t;
   uint64_t addr;
+  _linkedForData = 0;
   if (_registry_mutex.trylock_for(_timeout)) {
     if (_directory_mutex.trylock_for(_timeout)) {
       for (int i = 0; i < _registryEntries; i++) {
@@ -220,6 +222,7 @@ void CM_to_FC::sync_registry() {
               if (_fcDirectory[j].address==addr) {
                 _fcRegistry[i].directoryIndex = j;
                 printf("Found match at index %d\r\n", _fcRegistry[i].directoryIndex);
+                if (_fcDirectory[i].connectType==0x02) _linkedForData++;
               }
             }
           }
@@ -304,6 +307,11 @@ void CM_to_FC::_process_pod_data(uint64_t addr, char* payload, char len) {
   uint8_t registryIndex = 0xFF;
   uint8_t n;
   uint8_t k;
+  printf("Time to process some pod data!\r\n");
+  printf("Received from %016llX\r\n", addr);
+  printf("Length of data is %d\r\n", len);
+  for (int i = 0; i < len; i++) printf("%02X ", payload[i]);
+  printf("\r\n");
   if (_registry_mutex.trylock_for(_timeout) && _directory_mutex.trylock_for(_timeout)) {
     if (_registryEntries>0) {
       k = 0;
@@ -316,9 +324,11 @@ void CM_to_FC::_process_pod_data(uint64_t addr, char* payload, char len) {
         }
         k++;
       }
-      if ((registryIndex < _registryEntries) && (_fcRegistry[registryIndex].length == (len-1))) {
-        for (int j = 0; j < (len-1); j++)
-          _fcRegistry[registryIndex].data[j] = payload[j+1];
+      printf("Registry index: %d\r\n", registryIndex);
+      printf("Expected length of data: %d\r\n", _fcRegistry[registryIndex].length);
+      if ((registryIndex < _registryEntries) && (_fcRegistry[registryIndex].length == len)) {
+        for (int j = 1; j < len; j++)
+          _fcRegistry[registryIndex].data[j-1] = payload[j];
         _fcRegistry[registryIndex].dataUpdated = true; 
       } else {
       }
@@ -371,9 +381,9 @@ int CM_to_FC::get_pod_data(char podNum, char* data) {
       if (_fcRegistry[i].dataUpdated) {
         char n = _fcRegistry[i].directoryIndex;  // location of desired pod in directory
         if ((n != 0xFF) && (_fcDirectory[n].connectType == 0x02)) {
-          for (int j = 0; j < _fcRegistry[i].length; j++)
-            data[len+j] = _fcRegistry[i].data[j];
-          len = _fcRegistry[i].length;
+          for (int j = 0; j < (_fcRegistry[i].length-1); j++)
+            data[j] = _fcRegistry[i].data[j];
+          len = _fcRegistry[i].length-1;
           _fcRegistry[i].dataUpdated = false;
         }
       }
@@ -385,32 +395,37 @@ int CM_to_FC::get_pod_data(char podNum, char* data) {
 }
 
 int CM_to_FC::link_count() {
-  int linked = 0;
-  uint8_t n;
-  if (_registry_mutex.trylock_for(_timeout) && _directory_mutex.trylock_for(_timeout)) {
-    if (_registryEntries>0) {
-      for (int i = 0; i < _registryEntries; i++) {
-        n = _fcRegistry[i].directoryIndex;
-        if ((n != 0xFF) && (_fcDirectory[n].connectType == 0x02)) linked++;
-      }
-    }
-    _directory_mutex.unlock();
-    _registry_mutex.unlock();
-  }
-  return linked;
+  return _linkedForData;
 }
 
 bool CM_to_FC::is_all_data_updated() {
   bool ready = true;
   for (int i = 0; i < _registryEntries; i++)
-    ready = ready && _fcRegistry[i].dataUpdated;
+    if (_fcRegistry[i].length>0) {
+      ready = ready && _fcRegistry[i].dataUpdated;
+    }
   return ready;
 }
 
-char CM_to_FC::pod_index(char i) {
+char CM_to_FC::pod_index_to_number(char i) {
   if (i < _registryEntries) {
     return _fcRegistry[i].index;
+  } else {
+    return 0xFF;
   }
+}
+
+char CM_to_FC::pod_number_to_index(char podNum) {
+  char i = 0xFF;  // location of desired pod in registry
+  char k = 0;
+  if (_registry_mutex.trylock_for(_timeout)) {
+    while ((k < _registryEntries) && (i > _registryEntries)) {
+      if (_fcRegistry[k].index == podNum) i = k;
+      k++;
+    }
+    _registry_mutex.unlock();
+  }
+  return i;
 }
 
 void CM_to_FC::_process_rsvp(uint64_t addr, char connectType) {

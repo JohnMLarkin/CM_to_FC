@@ -9,9 +9,9 @@
 #ifndef CM_TO_FC_H
 #define CM_TO_FC_H
 
-#include "XBeeAPIParser.h"
-#include "mbed.h"
-#include "rtos.h"
+#include <XBeeAPIParser.h>
+#include <mbed.h>
+#include <rtos.h>
 #include <string> 
 using namespace std;
 
@@ -47,6 +47,7 @@ private:
   uint8_t _registryEntries; // Number of registered FCs
   directoryEntry_t _fcDirectory[MAX_FC];
   registryEntry_t _fcRegistry[MAX_FC];
+  uint8_t _linkedForData;
 
   // RTOS management
   Mutex _registry_mutex;
@@ -80,7 +81,8 @@ public:
   int  link_count();
   char registry_length();
   char directory_length();
-  char pod_index(char n);
+  char pod_index_to_number(char n);
+  char pod_number_to_index(char podNum);
   bool is_all_data_updated();
 
   void printDirectory();
