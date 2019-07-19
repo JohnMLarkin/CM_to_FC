@@ -76,6 +76,7 @@ public:
   void test_all_clocks();
   bool get_clock_status(char n, char* ni);
   void add_registry_entry(char n, char* ni, char len);
+  void get_registry_entry(char i, char *podNum, char* ni, char *podBytes);
   void sync_registry();
   int  get_pod_data(char n, char* data);
   int  link_count();

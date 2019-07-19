@@ -24,6 +24,16 @@ void CM_to_FC::add_registry_entry(char n, char* ni, char len) {
   }
 }
 
+void CM_to_FC::get_registry_entry(char i, char *podNum, char* ni, char *podBytes) {
+  if (_registry_mutex.trylock_for(_timeout)) {
+    if (i < _registryEntries) {
+      *podNum = _fcRegistry[i].index;
+      strcpy(ni, _fcRegistry[i].ni);
+      *podBytes = _fcRegistry[i].length;
+    }
+  }
+}
+
 /** Broadcast code for "Primed for Launch"
  * 
  * @parameter char dataInterval - time (in seconds) between Iridium transmissions
