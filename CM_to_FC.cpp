@@ -121,12 +121,12 @@ char CM_to_FC::directory_length() {
 void CM_to_FC::printDirectory() {
   if (_directory_mutex.trylock_for(_timeout)) {
     if (_directoryEntries>0) {
-      printf("Directory:\r\n");
-      printf("Index \tAddress \t\tConnectType \tGoodClock\r\n");
+      printf("Directory:\n");
+      printf("Index \tAddress \t\tConnectType \tGoodClock\n");
       for (int i = 0; i < _directoryEntries; i++) {
-        printf("%d \t%016llX \t%d \t\t%d\r\n", i, _fcDirectory[i].address, _fcDirectory[i].connectType,_fcDirectory[i].goodClock);
+        printf("%d \t%016llX \t%d \t\t%d\n", i, _fcDirectory[i].address, _fcDirectory[i].connectType,_fcDirectory[i].goodClock);
       }
-      printf("\r\n");
+      printf("\n");
     }
     _directory_mutex.unlock();
   }
@@ -135,16 +135,16 @@ void CM_to_FC::printDirectory() {
 void CM_to_FC::printRegistry() {
   if (_registry_mutex.trylock_for(_timeout)) {
     if (_registryEntries>0) {
-      printf("Registry:\r\n");
-      printf("Identifier \tDirectory Index\r\n");
+      printf("Registry:\n");
+      printf("Identifier \tDirectory Index\n");
       for (int i = 0; i < _registryEntries; i++) {
         if (_fcRegistry[i].directoryIndex != 0xFF) {
-          printf("%s \t%d\r\n", _fcRegistry[i].ni, _fcRegistry[i].directoryIndex);
+          printf("%s \t%d\n", _fcRegistry[i].ni, _fcRegistry[i].directoryIndex);
         } else {
-          printf("%s \tN/A\r\n", _fcRegistry[i].ni);
+          printf("%s \tN/A\n", _fcRegistry[i].ni);
         }
       }
-      printf("\r\n");
+      printf("\n");
     }
     _registry_mutex.unlock();
   }
@@ -222,18 +222,18 @@ void CM_to_FC::sync_registry() {
       t.start();
       for (int i = 0; i < _registryEntries; i++) {
         if (_fcRegistry[i].directoryIndex==0xFF) {
-          printf("Looking for %s\r\n", _fcRegistry[i].ni);
+          printf("Looking for %s\n", _fcRegistry[i].ni);
           t.reset();
           addr = 0;
           while ((addr == 0) && (t.elapsed_time() < 10*_timeout)) {
             addr = _xbee->get_address(_fcRegistry[i].ni);
           }
           if (addr >= XBEE_MIN_ADDRESS) {
-            printf("Its address is %016llX\r\n", addr);
+            printf("Its address is %016llX\n", addr);
             for (int j = 0; j < _directoryEntries; j++) {
               if (_fcDirectory[j].address==addr) {
                 _fcRegistry[i].directoryIndex = j;
-                printf("Found match at index %d\r\n", _fcRegistry[i].directoryIndex);
+                printf("Found match at index %d\n", _fcRegistry[i].directoryIndex);
                 if (_fcDirectory[i].connectType==0x02) _linkedForData++;
               }
             }
@@ -290,7 +290,7 @@ void CM_to_FC::_listen_for_rx() {
             break;
           default:
             // Nothing should fall into this category
-            printf("Error! Unexpected rx msg code %0X\r\n", msg[0]);
+            printf("Error! Unexpected rx msg code %0X\n", msg[0]);
         }
       }
     }
@@ -319,11 +319,11 @@ void CM_to_FC::_process_pod_data(uint64_t addr, char* payload, char len) {
   uint8_t registryIndex = 0xFF;
   uint8_t n;
   uint8_t k;
-  printf("Time to process some pod data!\r\n");
-  printf("Received from %016llX\r\n", addr);
-  printf("Length of data is %d\r\n", len);
+  printf("Time to process some pod data!\n");
+  printf("Received from %016llX\n", addr);
+  printf("Length of data is %d\n", len);
   for (int i = 0; i < len; i++) printf("%02X ", payload[i]);
-  printf("\r\n");
+  printf("\n");
   if (_registry_mutex.trylock_for(_timeout) && _directory_mutex.trylock_for(_timeout)) {
     if (_registryEntries>0) {
       k = 0;
@@ -336,8 +336,8 @@ void CM_to_FC::_process_pod_data(uint64_t addr, char* payload, char len) {
         }
         k++;
       }
-      printf("Registry index: %d\r\n", registryIndex);
-      printf("Expected length of data: %d\r\n", _fcRegistry[registryIndex].length);
+      printf("Registry index: %d\n", registryIndex);
+      printf("Expected length of data: %d\n", _fcRegistry[registryIndex].length);
       if ((registryIndex < _registryEntries) && (_fcRegistry[registryIndex].length == len)) {
         for (int j = 1; j < len; j++)
           _fcRegistry[registryIndex].data[j-1] = payload[j];
@@ -354,8 +354,8 @@ void CM_to_FC::printPodData() {
   uint8_t n;
   if (_registry_mutex.trylock_for(_timeout) && _directory_mutex.trylock_for(_timeout)) {
     if (_registryEntries>0) {
-      printf("Pod Data\r\n");
-      printf("--------\r\n");
+      printf("Pod Data\n");
+      printf("--------\n");
       for (int i = 0; i < _registryEntries; i++) {
         n = _fcRegistry[i].directoryIndex;
         if (n != 0xFF) {
@@ -363,11 +363,11 @@ void CM_to_FC::printPodData() {
             printf("Pod %d: ", i+1);
             for (int j = 0; j < _fcRegistry[i].length; j++)
               printf("%02X ", _fcRegistry[i].data[j]);
-            printf("\r\n");
+            printf("\n");
           }
         }
       }
-      printf("\r\n");
+      printf("\n");
     }
     _directory_mutex.unlock();
     _registry_mutex.unlock();
