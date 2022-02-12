@@ -2,10 +2,11 @@
 #include <rtos.h>
 #include <CM_to_FC.h>
 
-CM_to_FC::CM_to_FC(PinName tx, PinName rx) : _xbee(tx, rx) {
+CM_to_FC::CM_to_FC(PinName tx, PinName rx) {
+  _xbee = new XBeeAPIParser(tx, rx);
   _directoryEntries = 0;
   _registryEntries = 0;
-  _timeout = 100;
+  _timeout = 100ms;
   _linkedForData = 0;
   _rx_thread.start(callback(this, &CM_to_FC::_listen_for_rx));
 }
@@ -44,7 +45,7 @@ void CM_to_FC::broadcast_launch_primed(char dataInterval) {
   char msg[2];
   msg[0] = 0x01;
   msg[1] = dataInterval;
-  _xbee.txBroadcast(msg, 2);
+  _xbee->txBroadcast(msg, 2);
 }
 
 /** Broadcast code for "Launch Detected"
@@ -54,7 +55,7 @@ void CM_to_FC::broadcast_launch_primed(char dataInterval) {
 void CM_to_FC::broadcast_launch_detected() {
   char msg[1];
   msg[0] = 0x02;
-  _xbee.txBroadcast(msg, 1);
+  _xbee->txBroadcast(msg, 1);
 }
 
 /** Broadcast code for "Descent Detected"
@@ -64,7 +65,7 @@ void CM_to_FC::broadcast_launch_detected() {
 void CM_to_FC::broadcast_descent_detected() {
   char msg[1];
   msg[0] = 0x03;
-  _xbee.txBroadcast(msg, 1);
+  _xbee->txBroadcast(msg, 1);
 
 }
 
@@ -75,7 +76,7 @@ void CM_to_FC::broadcast_descent_detected() {
 void CM_to_FC::broadcast_landed() {
   char msg[1];
   msg[0] = 0x04;
-  _xbee.txBroadcast(msg, 1);
+  _xbee->txBroadcast(msg, 1);
 }
 
 void CM_to_FC::clear_registry() {
@@ -89,7 +90,7 @@ void CM_to_FC::clear_registry() {
 void CM_to_FC::invite() {
   char msg[1];
   msg[0] = 0x00;
-  _xbee.txBroadcast(msg, 1);
+  _xbee->txBroadcast(msg, 1);
 }
 
 void CM_to_FC::invite_registry() {
@@ -100,8 +101,8 @@ void CM_to_FC::invite_registry() {
     if (_registryEntries>0) {
       for (int i = 0; i < _registryEntries; i++) {
         if (_fcRegistry[i].directoryIndex == 0xFF) {
-          addr = _xbee.get_address(_fcRegistry[i].ni);
-          if (addr) _xbee.txAddressed(addr, msg, 1);
+          addr = _xbee->get_address(_fcRegistry[i].ni);
+          if (addr) _xbee->txAddressed(addr, msg, 1);
         }
       }
     }
@@ -166,7 +167,7 @@ bool CM_to_FC::get_clock_status(char n, char* ni) {
 void CM_to_FC::request_data(uint64_t addr) {
   char msg[1];
   msg[0] = 0x40;
-  _xbee.txAddressed(addr, msg, 1);
+  _xbee->txAddressed(addr, msg, 1);
 }
 
 void CM_to_FC::request_data_by_index(char n) {
@@ -209,7 +210,7 @@ void CM_to_FC::send_clock(uint64_t addr) {
   for (int i = 0; i < 4; i++) {
     msg[i+1] = (t >> ((3-i)*8)) & 0xFF;
   }
-  _xbee.txAddressed(addr, msg, 5);
+  _xbee->txAddressed(addr, msg, 5);
 }
 
 void CM_to_FC::sync_registry() {
@@ -223,8 +224,8 @@ void CM_to_FC::sync_registry() {
           printf("Looking for %s\r\n", _fcRegistry[i].ni);
           t.start();
           addr = 0;
-          while (addr == 0) {
-            addr = _xbee.get_address(_fcRegistry[i].ni);
+          while ((addr == 0) && (t.elapsed_time() < 10*_timeout)) {
+            addr = _xbee->get_address(_fcRegistry[i].ni);
           }
           if (addr >= XBEE_MIN_ADDRESS) {
             printf("Its address is %016llX\r\n", addr);
@@ -263,18 +264,18 @@ void CM_to_FC::test_clock(uint64_t addr) {
   for (int i = 0; i < 4; i++) {
     msg[i+1] = (t >> ((3-i)*8)) & 0xFF;
   }
-  _xbee.txAddressed(addr, msg, 5);
+  _xbee->txAddressed(addr, msg, 5);
 }
 
 void CM_to_FC::_listen_for_rx() {
   int len;
   char msg[MAX_MSG_LENGTH];
   uint64_t sender = 0;
-  _xbee.set_frame_alert_thread_id(osThreadGetId());
+  _xbee->set_frame_alert_thread_id(osThreadGetId());
   while (true) {
     osSignalWait(0x01,osWaitForever);
-    if (_xbee.readable()) {
-      len = _xbee.rxPacket(msg, &sender);
+    if (_xbee->readable()) {
+      len = _xbee->rxPacket(msg, &sender);
       if (len > 0) {
         switch (msg[0]) {
           case 0x10:  // Response to invite
@@ -288,7 +289,7 @@ void CM_to_FC::_listen_for_rx() {
             break;
           default:
             // Nothing should fall into this category
-            printf("Error! Unexpect rx msg code %0X\r\n", msg[0]);
+            printf("Error! Unexpected rx msg code %0X\r\n", msg[0]);
         }
       }
     }

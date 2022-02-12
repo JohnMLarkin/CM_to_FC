@@ -9,9 +9,8 @@
 #ifndef CM_TO_FC_H
 #define CM_TO_FC_H
 
-#include <XBeeAPIParser.h>
+#include "XBeeAPIParser.h"
 #include <mbed.h>
-#include <rtos.h>
 #include <string> 
 using namespace std;
 
@@ -39,8 +38,8 @@ extern DigitalOut led2;;
 class CM_to_FC
 {
 private:
-  XBeeAPIParser _xbee;
-  uint32_t _timeout;
+  XBeeAPIParser* _xbee;
+  std::chrono::milliseconds _timeout;
 
   // Objects that should be guarded by mutex (for exclusive access)
   uint8_t _directoryEntries; // Number of associated FCs
