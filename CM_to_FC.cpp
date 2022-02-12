@@ -219,10 +219,11 @@ void CM_to_FC::sync_registry() {
   _linkedForData = 0;
   if (_registry_mutex.trylock_for(_timeout)) {
     if (_directory_mutex.trylock_for(_timeout)) {
+      t.start();
       for (int i = 0; i < _registryEntries; i++) {
         if (_fcRegistry[i].directoryIndex==0xFF) {
           printf("Looking for %s\r\n", _fcRegistry[i].ni);
-          t.start();
+          t.reset();
           addr = 0;
           while ((addr == 0) && (t.elapsed_time() < 10*_timeout)) {
             addr = _xbee->get_address(_fcRegistry[i].ni);
